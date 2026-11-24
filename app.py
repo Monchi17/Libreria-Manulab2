@@ -267,7 +267,7 @@ def plot_muros_altillos(muros):
         if len(muro)>5:
             aberturas.extend(x for x in muro[5:] if isinstance(x,tuple))
 
-        fig,ax=plt.subplots(figsize=(5,3))
+        fig,ax=plt.subplots(figsize=(8,5))
 
         dibujar_muro_altillo(ax,largo,h_izq,h_der,viga,pies,aberturas,tiene_ventana_altillo,ventana_altillo[2])
 
@@ -280,8 +280,6 @@ def plot_muros_altillos(muros):
         ax.set_ylim(-150,max(h_izq,h_der,viga)+300)
         ax.set_aspect("equal",adjustable="box")
         ax.grid(alpha=.3)
-        ax.set_xlabel("Ancho / desplazamiento (mm)")
-        ax.set_ylabel("Alto (mm)")
         ax.set_title(f"MURO {i} - ESTRUCTURA")
 
         plt.tight_layout()
@@ -388,7 +386,7 @@ elif st.session_state.libreria_seleccionada == "LIB 00":
     figuras = plot_muros_altillos(MUROS_LIB_02)
 
     for i, figura in enumerate(figuras, start=1):
-        st.pyplot(figura, use_container_width=True)
+        st.pyplot(figura, use_container_width=False)
         plt.close(figura)
 
 elif st.session_state.libreria_seleccionada == "LIB 03":
