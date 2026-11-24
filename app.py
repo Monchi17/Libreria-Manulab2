@@ -267,8 +267,7 @@ def plot_muros_altillos(muros):
         if len(muro)>5:
             aberturas.extend(x for x in muro[5:] if isinstance(x,tuple))
 
-        fig,ax=plt.subplots(figsize=(8,5))
-
+        fig,ax=plt.subplots(figsize=(4,2.5))
         dibujar_muro_altillo(ax,largo,h_izq,h_der,viga,pies,aberturas,tiene_ventana_altillo,ventana_altillo[2])
 
         if tiene_ventana_altillo:
