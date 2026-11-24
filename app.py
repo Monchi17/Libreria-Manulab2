@@ -279,7 +279,7 @@ def plot_muros_altillos(muros):
         ax.set_ylim(-150,max(h_izq,h_der,viga)+300)
         ax.set_aspect("equal",adjustable="box")
         ax.grid(alpha=.3)
-        ax.set_title(f"MURO {i} - ESTRUCTURA")
+        ax.set_title(f"MURO {i} ")
 
         plt.tight_layout()
         figuras.append(fig)
