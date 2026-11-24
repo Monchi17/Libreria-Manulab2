@@ -318,7 +318,7 @@ MUROS_LIB_02 = [
 # INTERFAZ PRINCIPAL
 
 st.set_page_config(
-    page_title="Librería Manulab",
+    page_title="Librerías Manulab",
     page_icon="🏗️",
     layout="wide"
 )
