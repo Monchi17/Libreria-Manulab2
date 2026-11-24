@@ -364,16 +364,16 @@ if "libreria_seleccionada" not in st.session_state:
 col1, col2, col3 = st.columns(3)
 
 with col1:
+    if st.button("LIB 00", key="lib00"):
+        st.session_state.libreria_seleccionada = "LIB 00"
+
+with col2:
     if st.button("LIB 01", key="lib01"):
         st.session_state.libreria_seleccionada = "LIB 01"
 
-with col2:
+with col3:
     if st.button("LIB 02", key="lib02"):
         st.session_state.libreria_seleccionada = "LIB 02"
-
-with col3:
-    if st.button("LIB 03", key="lib03"):
-        st.session_state.libreria_seleccionada = "LIB 03"
 
 st.divider()
 
@@ -381,9 +381,9 @@ if st.session_state.libreria_seleccionada == "LIB 01":
     st.subheader("LIBRERÍA 01")
     st.info("Esta librería estará disponible próximamente.")
 
-elif st.session_state.libreria_seleccionada == "LIB 02":
-    st.subheader("LIBRERÍA 02")
-    st.caption("Muros y altillos — visualización de estructuras")
+elif st.session_state.libreria_seleccionada == "LIB 00":
+    st.subheader("LIBRERÍA 00")
+    st.caption("Refugio")
 
     figuras = plot_muros_altillos(MUROS_LIB_02)
 
