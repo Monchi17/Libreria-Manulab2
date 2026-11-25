@@ -1,299 +1,24 @@
 
+
 import os
 import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle,Polygon,Circle
 
+# ============================================================
+# CONFIGURACION GENERAL
+# ============================================================
+
+st.set_page_config(page_title="Librerías Manulab",page_icon="🏗️",layout="wide")
+
 ESPESOR=41
-DIAMETRO_PUNTO=4
-RADIO_PUNTO=DIAMETRO_PUNTO/2
-LARGO_ESCUADRA=100
 ALTURA_VIGA=2440
 ALTURA_VENTANA=936+41*2
 TIPOS_VENTANA=("V1","V2","V3","V4")
 
-LARGO_MURO=2400
-MARGEN_SUPERIOR=300
-ALTURA_MURO_CIEGO=2318
-
-MUROS=[("V2",1500,1200,1200,0),("V1",1350,500,800,280),("V1",1350,500,800,-280),("P3",1350,832,2025,-109),("P1",1200,900,2025,0),("P2",1500,900,2025,-109)]
-
-MUROS_CIEGOS=[(600,[],250*3+450+750+900),(900,[580],250*2+450+750),(750,[580],250+450),(450,[],0)]
-MUROS_CIEGOS_2=[(1500,[580,1180],0),(1200,[600],1500+250),(1200,[580],1500+250)]
-
-ALTILLOS=[("F1",954,3641,[600,600,600,600,600]),("F2",300,3641,[600,600,600,600,600]),("F3",630,3641,[600,600,600,600,600])]
-
-FRONTONES_TRIANGULARES=[("F1",3300,1278,802,[213,540,579,559,559]),("F2",2400,882,594,[559,559,559]),("F3",3750,594,144,[489,630,559,579,691,448])]
-
-TECHUMBRES=[
-(1200,2740,[518+ESPESOR,518+ESPESOR*2],[1138+ESPESOR,1138+ESPESOR*2+300],[1200,1540]),
-(1200,3150,[518+ESPESOR,518+ESPESOR*2],[1138+ESPESOR,1138+ESPESOR*2+710],[1200,1950]),
-(900,2740,[368+ESPESOR,368+ESPESOR*2],[1138+ESPESOR,1138+ESPESOR*2+300],[1200,1540]),
-(900,3150,[368+ESPESOR,368+ESPESOR*2],[1159+ESPESOR,1159+ESPESOR+689],[1200,1200+ESPESOR+709])
-]
-
-ENTREPISOS=[
-(750,2850,[314+ESPESOR],[1138+ESPESOR,1138+ESPESOR+389],[ESPESOR+1159,ESPESOR+1159+ESPESOR+385]),
-(1200,2850,[359+ESPESOR,359*2+ESPESOR*2],[1138+ESPESOR,1609],[ESPESOR+1159,ESPESOR+1159+ESPESOR+389],[1138+ESPESOR,1609]),
-(1200,1950,[359+ESPESOR,359*2+ESPESOR*2],[1138+ESPESOR],[1155+ESPESOR],[1138+ESPESOR]),
-(900,2850,[359+ESPESOR,359*2+ESPESOR*2],[1138+ESPESOR,1138+ESPESOR+389+ESPESOR],[ESPESOR+1159,ESPESOR+1159+ESPESOR+389],[]),
-(750,2700,[359+ESPESOR],[1138+ESPESOR,ESPESOR+1138+ESPESOR+259],[ESPESOR+1159,ESPESOR+1159+ESPESOR+259]),
-(750,1800,[359+ESPESOR],[ESPESOR+1138],[ESPESOR+1159],[])
-]
-
-def configurar_ejes(ax,ancho,alto,margen=100):
-    ax.set_xlim(-margen,ancho+margen)
-    ax.set_ylim(-margen,alto+margen)
-    ax.set_aspect("equal",adjustable="box")
-    ax.set_xlabel("Ancho (mm)")
-    ax.set_ylabel("Alto (mm)")
-    ax.grid(True,linestyle="--",alpha=.35)
-
-def crear_figura(titulo,ancho,alto,margen=100,tamano=(9,5)):
-    fig,ax=plt.subplots(figsize=tamano)
-    ax.set_title(titulo)
-    configurar_ejes(ax,ancho,alto,margen)
-    return fig,ax
-
-def dibujar_rectangulo(ax,x,y,ancho,alto,color="black",lw=.8):
-    ax.add_patch(Rectangle((x,y),ancho,alto,fill=False,edgecolor=color,linewidth=lw))
-
-def dibujar_rect_lineas(ax,x,y,ancho,largo,lw=.7,color="black",relleno=None):
-    ax.add_patch(Rectangle((x,y),ancho,largo,fill=bool(relleno),edgecolor=color,facecolor=relleno if relleno else "none",linewidth=lw))
-
-def posicion_abertura(ancho_muro,largo_muro,ancho_ab,largo_ab,margen_superior,desplazamiento=0):
-    return (ancho_muro-ancho_ab)/2+desplazamiento,largo_muro-margen_superior-largo_ab
-
-def crear_muros_con_aberturas(modelos,largo_muro,margen_superior):
-    muros=[]
-    for nombre,ancho_muro,ancho_ab,alto_ab,desplazamiento in modelos:
-        x,y=posicion_abertura(ancho_muro,largo_muro,ancho_ab,alto_ab,margen_superior,desplazamiento)
-        tipo="Puerta" if nombre.startswith("P") else "Ventana"
-        muros.append({"nombre":nombre,"tipo":tipo,"muro":(ancho_muro,largo_muro),"abertura":(ancho_ab,alto_ab),"posicion":(x,y)})
-    return muros
-
-def piezas_marco_ventana(x,y,ancho,alto,e):
-    return [(x-e,y+alto,ancho+2*e,e),(x-e,y-e,ancho+2*e,e),(x-e,y,e,alto),(x+ancho,y,e,alto)]
-
-def piezas_marco_puerta(x,y,ancho,alto,e):
-    return [(x-e,y+alto,ancho+2*e,e),(x-e,y,e,alto),(x+ancho,y,e,alto)]
-
-def generar_figuras_muros_aberturas():
-    figuras=[]
-    muros=crear_muros_con_aberturas(MUROS,LARGO_MURO,MARGEN_SUPERIOR)
-    for i,m in enumerate(muros):
-        ancho_muro,largo_muro=m["muro"]
-        w,h=m["abertura"]
-        x,y=m["posicion"]
-        fig,ax=plt.subplots(figsize=(5,6))
-        ax.set_title(f'{m["nombre"]} - {ancho_muro} mm')
-        dibujar_rect_lineas(ax,0,0,ancho_muro,largo_muro)
-        dibujar_rect_lineas(ax,x,y,w,h)
-        piezas=piezas_marco_ventana(x,y,w,h,ESPESOR) if m["tipo"]=="Ventana" else piezas_marco_puerta(x,y,w,h,ESPESOR)
-        for pieza in piezas:
-            dibujar_rect_lineas(ax,*pieza)
-        dibujar_rect_lineas(ax,0,largo_muro-ESPESOR,ancho_muro,ESPESOR)
-        dibujar_rect_lineas(ax,0,0,ancho_muro,ESPESOR)
-        centro=x+w/2
-        x_centro=centro-ESPESOR/2
-        y_inicio=y+h
-        altura=largo_muro-y_inicio
-        if altura>0:
-            dibujar_rect_lineas(ax,x_centro,y_inicio,ESPESOR,altura)
-        dibujar_rect_lineas(ax,0,0,ESPESOR,largo_muro)
-        dibujar_rect_lineas(ax,ancho_muro-ESPESOR,0,ESPESOR,largo_muro)
-        for px in (x-2*ESPESOR,x-ESPESOR,x+w,x+w+ESPESOR):
-            if 0<=px<=ancho_muro-ESPESOR:
-                dibujar_rect_lineas(ax,px,0,ESPESOR,largo_muro)
-        ax.set_xlim(-100,ancho_muro+100)
-        ax.set_ylim(-100,largo_muro+100)
-        ax.set_aspect("equal")
-        ax.set_xlabel("Ancho (mm)")
-        ax.set_ylabel("Alto (mm)")
-        ax.grid(True,alpha=.25)
-        figuras.append(fig)
-    return figuras
-
-def dibujar_muro_ciego(ax,ancho,pies):
-    e=ESPESOR
-    alto=ALTURA_MURO_CIEGO
-    dibujar_rectangulo(ax,0,0,ancho,alto)
-    dibujar_rectangulo(ax,0,0,e,alto)
-    dibujar_rectangulo(ax,ancho-e,0,e,alto)
-    dibujar_rectangulo(ax,0,0,ancho,e)
-    dibujar_rectangulo(ax,0,alto-e,ancho,e)
-    for x in pies:
-        if e<x<ancho-e:
-            dibujar_rectangulo(ax,x,e,e,alto-2*e)
-
-def generar_figuras_muros_ciegos(muros,grupo):
-    figuras=[]
-    for i,(ancho,pies,_) in enumerate(muros):
-        fig,ax=crear_figura(f"Muro ciego {grupo} - {i+1}",ancho,ALTURA_MURO_CIEGO,100,(6,7))
-        dibujar_muro_ciego(ax,ancho,pies)
-        figuras.append(fig)
-    return figuras
-
-def convertir_letra(n):
-    letra=""
-    while n>=0:
-        letra=chr(n%26+65)+letra
-        n=n//26-1
-    return letra
-
-def agregar_punto(ax,x,y,puntos,r=RADIO_PUNTO):
-    ax.add_patch(Circle((x,y),r,color="red",zorder=5))
-    puntos.append((x,y))
-
-def dibujar_puntos_palos(ax,x0,y0,alto,largo,posiciones,e=ESPESOR):
-    r=RADIO_PUNTO
-    puntos=[]
-    posiciones=sorted(set(posiciones))
-    for i,p in enumerate(posiciones):
-        izquierda=abs(p)<=1e-6
-        derecha=abs(p-(largo-e))<=1e-6
-        if not derecha:
-            py=y0+alto-e-r
-            if i>=len(posiciones)-2:
-                py=y0+alto-ESPESOR*2
-            agregar_punto(ax,x0+p+e+r*2,py-r*2,puntos,r)
-        if not izquierda:
-            py=y0+e+r
-            if i==1:
-                py=y0+ESPESOR*2
-            agregar_punto(ax,x0+p-r*2,py+r*2,puntos,r)
-        if izquierda:
-            agregar_punto(ax,x0+p+e+r*2,y0+ESPESOR*2+r*2,puntos,r)
-    agregar_punto(ax,x0+largo-ESPESOR-r*2,y0+alto-ESPESOR*2-r*2,puntos,r)
-    return puntos
-
-def dibujar_esquinas_L_componentes(ax,x0,y0,largo,alto,largo_L=LARGO_ESCUADRA,lw=1.5):
-    esquinas=[(x0,y0,1,1),(x0+largo,y0,-1,1),(x0,y0+alto,1,-1),(x0+largo,y0+alto,-1,-1)]
-    for x,y,dx,dy in esquinas:
-        ax.plot([x,x+dx*largo_L],[y,y],color="blue",lw=lw,zorder=6)
-        ax.plot([x,x],[y,y+dy*largo_L],color="blue",lw=lw,zorder=6)
-
-def dibujar_letras_puntos(ax,puntos,letra_inicial=0):
-    for i,(x,y) in enumerate(puntos):
-        ax.annotate(convertir_letra(letra_inicial+i),(x,y),xytext=(3,2),textcoords="offset points",fontsize=6,color="darkred",fontweight="bold",zorder=8)
-
-def dibujar_altillo_componentes(ax,alto,largo,espaciamientos):
-    e=ESPESOR
-    posiciones=[0]
-    acumulado=0
-    for distancia in espaciamientos:
-        acumulado+=distancia
-        posiciones.append(acumulado)
-    posiciones.append(largo-e)
-    posiciones=sorted(set(p for p in posiciones if 0<=p and p+e<=largo))
-    piezas=[(0,0,largo,e),(0,alto-e,largo,e),(e,e,559,e),(largo-600,alto-2*e,559,e)]+[(p,0,e,alto) for p in posiciones]
-    for x,y,w,h in piezas:
-        dibujar_rectangulo(ax,x,y,w,h)
-    puntos=dibujar_puntos_palos(ax,0,0,alto,largo,posiciones)
-    dibujar_esquinas_L_componentes(ax,0,0,largo,alto)
-    dibujar_letras_puntos(ax,puntos)
-    
-def generar_figuras_altillos_componentes():
-    figuras=[]
-    for nombre,alto,largo,espaciamientos in ALTILLOS:
-        fig,ax=crear_figura(f"Altillo {nombre}",largo,alto,120)
-        dibujar_altillo_componentes(ax,alto,largo,espaciamientos)
-        figuras.append(fig)
-    return figuras
-
-def calcular_posiciones_palos(largo,espaciamientos):
-    posiciones=[0]
-    acumulado=0
-    for distancia in espaciamientos:
-        acumulado+=ESPESOR+distancia
-        posiciones.append(acumulado)
-    posicion_final=largo-ESPESOR
-    if posiciones[-1]<posicion_final:
-        posiciones.append(posicion_final)
-    elif posiciones[-1]>posicion_final:
-        posiciones=[p for p in posiciones if p<=posicion_final]
-        posiciones.append(posicion_final)
-    return sorted(set(posiciones))
-
-def dibujar_fronton_triangular(ax,largo,alto_mayor,alto_menor,espaciamientos):
-    e=ESPESOR
-    pendiente=(alto_mayor-alto_menor)/largo
-    dibujar_rectangulo(ax,0,0,largo,e)
-    puntos_superior=[(0,alto_mayor),(largo,alto_menor),(largo,alto_menor-e),(0,alto_mayor-e)]
-    ax.add_patch(Polygon(puntos_superior,closed=True,fill=False,edgecolor="black",linewidth=.8))
-    for x in calcular_posiciones_palos(largo,espaciamientos):
-        if 0<=x and x+e<=largo:
-            altura=alto_mayor-pendiente*(x+e/2)
-            dibujar_rectangulo(ax,x,e,e,max(0,altura-e))
-
-def generar_figuras_frontones():
-    figuras=[]
-    for nombre,largo,alto_mayor,alto_menor,espaciamientos in FRONTONES_TRIANGULARES:
-        fig,ax=crear_figura(f"Frontón triangular {nombre}",largo,alto_mayor,alto_menor+120,(9,5))
-        dibujar_fronton_triangular(ax,largo,alto_mayor,alto_menor,espaciamientos)
-        figuras.append(fig)
-    return figuras
-
-def dibujar_techumbre(ax,ancho,largo,pies,piezas_izquierdas,piezas_derechas):
-    e=ESPESOR
-    dibujar_rectangulo(ax,0,0,ancho,largo)
-    dibujar_rectangulo(ax,0,0,ancho,e)
-    dibujar_rectangulo(ax,0,largo-e,ancho,e)
-    dibujar_rectangulo(ax,0,0,e,largo)
-    dibujar_rectangulo(ax,ancho-e,0,e,largo)
-    for x in pies:
-        if e<x<ancho-e:
-            dibujar_rectangulo(ax,x,e,e,largo-2*e)
-    for y in piezas_izquierdas:
-        if 0<=y and y+e<=largo:
-            largo_pieza=max(0,pies[0]-e) if pies else ancho-2*e
-            if largo_pieza>0:
-                dibujar_rectangulo(ax,e,y,largo_pieza,e)
-    for y in piezas_derechas:
-        if 0<=y and y+e<=largo:
-            inicio=pies[-1]+e if pies else e
-            largo_pieza=max(0,ancho-e-inicio)
-            if largo_pieza>0:
-                dibujar_rectangulo(ax,inicio,y,largo_pieza,e)
-
-def generar_figuras_techumbres():
-    figuras=[]
-    for i,(ancho,largo,pies,izquierdas,derechas) in enumerate(TECHUMBRES):
-        fig,ax=crear_figura(f"Techumbre {i+1}",ancho,largo,100)
-        dibujar_techumbre(ax,ancho,largo,pies,izquierdas,derechas)
-        figuras.append(fig)
-    return figuras
-
-def dibujar_entrepiso(ax,ancho,largo,pies,espacios):
-    e=ESPESOR
-    dibujar_rectangulo(ax,0,0,ancho,largo)
-    dibujar_rectangulo(ax,0,0,ancho,e)
-    dibujar_rectangulo(ax,0,largo-e,ancho,e)
-    dibujar_rectangulo(ax,0,0,e,largo)
-    dibujar_rectangulo(ax,ancho-e,0,e,largo)
-    pies_validos=[x for x in pies if e<x<ancho-e]
-    for x in pies_validos:
-        dibujar_rectangulo(ax,x,e,e,largo-2*e)
-    limites=sorted(set([e]+pies_validos+[ancho-e]))
-    for i,posiciones in enumerate(espacios):
-        if i>=len(limites)-1:
-            break
-        x_inicio=limites[i]
-        ancho_pieza=limites[i+1]-x_inicio
-        for y in posiciones:
-            if 0<=y and y+e<=largo:
-                dibujar_rectangulo(ax,x_inicio,y,ancho_pieza,e)
-
-def generar_figuras_entrepisos():
-    figuras=[]
-    for i,(ancho,largo,pies,*espacios) in enumerate(ENTREPISOS):
-        fig,ax=crear_figura(f"Entrepiso {i+1}",ancho,largo,100)
-        dibujar_entrepiso(ax,ancho,largo,pies,espacios)
-        figuras.append(fig)
-    return figuras
-
-
-# LIBRERIA 02: MUROS Y ALTILLOS
+# ============================================================
+# LIB 00 - CODIGO ORIGINAL
+# ============================================================
 
 piezas_Muros_Altillos=[]
 
@@ -511,7 +236,7 @@ def plot_muros_altillos(muros):
             aberturas.append(muro[4])
         if len(muro)>5:
             aberturas.extend(x for x in muro[5:] if isinstance(x,tuple))
-        fig,ax=plt.subplots(figsize=(7,4))
+        fig,ax=plt.subplots(figsize=(4,2.5))
         dibujar_muro_altillo(ax,largo,h_izq,h_der,viga,pies,aberturas,tiene_ventana_altillo,ventana_altillo[2])
         if tiene_ventana_altillo:
             dibujar_ventana_altillo(ax,largo,h_izq,h_der)
@@ -520,22 +245,356 @@ def plot_muros_altillos(muros):
         ax.set_ylim(-150,max(h_izq,h_der,viga)+300)
         ax.set_aspect("equal",adjustable="box")
         ax.grid(alpha=.3)
-        ax.set_title(f"MURO {i}",fontsize=10)
-        ax.tick_params(axis="both",labelsize=7)
+        ax.set_title(f"MURO {i}",fontsize=8)
+        ax.tick_params(axis="both",labelsize=6)
         plt.tight_layout()
         figuras.append(fig)
     return figuras
 
 
-# INTERFAZ STREAMLIT
+# ============================================================
+# LIB 02 - DATOS Y FUNCIONES INDEPENDIENTES
+# ============================================================
 
-st.set_page_config(page_title="Librerías Manulab",page_icon="🏗️",layout="wide")
+LIB02_ESPESOR=41
+LIB02_DIAMETRO_PUNTO=4
+LIB02_RADIO_PUNTO=LIB02_DIAMETRO_PUNTO/2
+LIB02_LARGO_ESCUADRA=100
+LIB02_LARGO_MURO=2400
+LIB02_MARGEN_SUPERIOR=300
+LIB02_ALTURA_MURO_CIEGO=2318
+
+LIB02_MUROS=[
+("V2",1500,1200,1200,0),
+("V1",1350,500,800,280),
+("V1",1350,500,800,-280),
+("P3",1350,832,2025,-109),
+("P1",1200,900,2025,0),
+("P2",1500,900,2025,-109)
+]
+
+LIB02_MUROS_CIEGOS=[
+(600,[],250*3+450+750+900),
+(900,[580],250*2+450+750),
+(750,[580],250+450),
+(450,[],0)
+]
+
+LIB02_MUROS_CIEGOS_2=[
+(1500,[580,1180],0),
+(1200,[600],1500+250),
+(1200,[580],1500+250)
+]
+
+LIB02_ALTILLOS=[
+("F1",954,3641,[600,600,600,600,600]),
+("F2",300,3641,[600,600,600,600,600]),
+("F3",630,3641,[600,600,600,600,600])
+]
+
+LIB02_FRONTONES=[
+("F1",3300,1278,802,[213,540,579,559,559]),
+("F2",2400,882,594,[559,559,559]),
+("F3",3750,594,144,[489,630,559,579,691,448])
+]
+
+LIB02_TECHUMBRES=[
+(1200,2740,[518+41,518+41*2],[1138+41,1138+41*2+300],[1200,1540]),
+(1200,3150,[518+41,518+41*2],[1138+41,1138+41*2+710],[1200,1950]),
+(900,2740,[368+41,368+41*2],[1138+41,1138+41*2+300],[1200,1540]),
+(900,3150,[368+41,368+41*2],[1159+41,1159+41+689],[1200,1200+41+709])
+]
+
+LIB02_ENTREPISOS=[
+(750,2850,[314+41],[1138+41,1138+41+389],[41+1159,41+1159+41+385]),
+(1200,2850,[359+41,359*2+41*2],[1138+41,1609],[41+1159,41+1159+41+389],[1138+41,1609]),
+(1200,1950,[359+41,359*2+41*2],[1138+41],[1155+41],[1138+41]),
+(900,2850,[359+41,359*2+41*2],[1138+41,1138+41+389+41],[41+1159,41+1159+41+389],[]),
+(750,2700,[359+41],[1138+41,41+1138+41+259],[41+1159,41+1159+41+259]),
+(750,1800,[359+41],[41+1138],[41+1159],[])
+]
+
+def lib02_configurar_ejes(ax,ancho,alto,margen=100):
+    ax.set_xlim(-margen,ancho+margen)
+    ax.set_ylim(-margen,alto+margen)
+    ax.set_aspect("equal",adjustable="box")
+    ax.set_xlabel("Ancho (mm)")
+    ax.set_ylabel("Alto (mm)")
+    ax.grid(True,linestyle="--",alpha=.35)
+
+def lib02_crear_figura(titulo,ancho,alto,margen=100,tamano=(9,5)):
+    fig,ax=plt.subplots(figsize=tamano)
+    ax.set_title(titulo)
+    lib02_configurar_ejes(ax,ancho,alto,margen)
+    return fig,ax
+
+def lib02_rectangulo(ax,x,y,ancho,alto):
+    ax.add_patch(Rectangle((x,y),ancho,alto,fill=False,edgecolor="black",linewidth=.8))
+
+def lib02_rect_lineas(ax,x,y,ancho,largo):
+    ax.add_patch(Rectangle((x,y),ancho,largo,fill=False,edgecolor="black",linewidth=.7))
+
+def lib02_posicion_abertura(ancho_muro,largo_muro,ancho_ab,largo_ab,margen_superior,desplazamiento=0):
+    return (ancho_muro-ancho_ab)/2+desplazamiento,largo_muro-margen_superior-largo_ab
+
+def lib02_crear_muros_aberturas():
+    muros=[]
+    for nombre,ancho_muro,ancho_ab,alto_ab,desplazamiento in LIB02_MUROS:
+        x,y=lib02_posicion_abertura(ancho_muro,LIB02_LARGO_MURO,ancho_ab,alto_ab,LIB02_MARGEN_SUPERIOR,desplazamiento)
+        tipo="Puerta" if nombre.startswith("P") else "Ventana"
+        muros.append({"nombre":nombre,"tipo":tipo,"muro":(ancho_muro,LIB02_LARGO_MURO),"abertura":(ancho_ab,alto_ab),"posicion":(x,y)})
+    return muros
+
+def lib02_generar_muros_aberturas():
+    figuras=[]
+    for i,m in enumerate(lib02_crear_muros_aberturas()):
+        ancho_muro,largo_muro=m["muro"]
+        w,h=m["abertura"]
+        x,y=m["posicion"]
+        fig,ax=plt.subplots(figsize=(5,6))
+        ax.set_title(f'{m["nombre"]} - {ancho_muro} mm')
+        lib02_rect_lineas(ax,0,0,ancho_muro,largo_muro)
+        lib02_rect_lineas(ax,x,y,w,h)
+        if m["tipo"]=="Ventana":
+            piezas=[(x-41,y+h,w+82,41),(x-41,y-41,w+82,41),(x-41,y,41,h),(x+w,y,41,h)]
+        else:
+            piezas=[(x-41,y+h,w+82,41),(x-41,y,41,h),(x+w,y,41,h)]
+        for pieza in piezas:
+            lib02_rect_lineas(ax,*pieza)
+        lib02_rect_lineas(ax,0,largo_muro-41,ancho_muro,41)
+        lib02_rect_lineas(ax,0,0,ancho_muro,41)
+        centro=x+w/2
+        y_inicio=y+h
+        if largo_muro-y_inicio>0:
+            lib02_rect_lineas(ax,centro-41/2,y_inicio,41,largo_muro-y_inicio)
+        lib02_rect_lineas(ax,0,0,41,largo_muro)
+        lib02_rect_lineas(ax,ancho_muro-41,0,41,largo_muro)
+        for px in (x-82,x-41,x+w,x+w+41):
+            if 0<=px<=ancho_muro-41:
+                lib02_rect_lineas(ax,px,0,41,largo_muro)
+        ax.set_xlim(-100,ancho_muro+100)
+        ax.set_ylim(-100,largo_muro+100)
+        ax.set_aspect("equal")
+        ax.set_xlabel("Ancho (mm)")
+        ax.set_ylabel("Alto (mm)")
+        ax.grid(True,alpha=.25)
+        figuras.append(fig)
+    return figuras
+
+def lib02_dibujar_muro_ciego(ax,ancho,pies):
+    e=41
+    alto=LIB02_ALTURA_MURO_CIEGO
+    lib02_rectangulo(ax,0,0,ancho,alto)
+    lib02_rectangulo(ax,0,0,e,alto)
+    lib02_rectangulo(ax,ancho-e,0,e,alto)
+    lib02_rectangulo(ax,0,0,ancho,e)
+    lib02_rectangulo(ax,0,alto-e,ancho,e)
+    for x in pies:
+        if e<x<ancho-e:
+            lib02_rectangulo(ax,x,e,e,alto-2*e)
+
+def lib02_generar_muros_ciegos(muros,grupo):
+    figuras=[]
+    for i,(ancho,pies,_) in enumerate(muros):
+        fig,ax=lib02_crear_figura(f"Muro ciego {grupo} - {i+1}",ancho,LIB02_ALTURA_MURO_CIEGO,100,(6,7))
+        lib02_dibujar_muro_ciego(ax,ancho,pies)
+        figuras.append(fig)
+    return figuras
+
+def lib02_convertir_letra(n):
+    letra=""
+    while n>=0:
+        letra=chr(n%26+65)+letra
+        n=n//26-1
+    return letra
+
+def lib02_agregar_punto(ax,x,y,puntos):
+    ax.add_patch(Circle((x,y),LIB02_RADIO_PUNTO,color="red",zorder=5))
+    puntos.append((x,y))
+
+def lib02_dibujar_puntos(ax,x0,y0,alto,largo,posiciones):
+    r=LIB02_RADIO_PUNTO
+    puntos=[]
+    posiciones=sorted(set(posiciones))
+    for i,p in enumerate(posiciones):
+        izquierda=abs(p)<=1e-6
+        derecha=abs(p-(largo-41))<=1e-6
+        if not derecha:
+            py=y0+alto-41-r
+            if i>=len(posiciones)-2:
+                py=y0+alto-82
+            lib02_agregar_punto(ax,x0+p+41+r*2,py-r*2,puntos)
+        if not izquierda:
+            py=y0+41+r
+            if i==1:
+                py=y0+82
+            lib02_agregar_punto(ax,x0+p-r*2,py+r*2,puntos)
+        if izquierda:
+            lib02_agregar_punto(ax,x0+p+41+r*2,y0+82+r*2,puntos)
+    lib02_agregar_punto(ax,x0+largo-41-r*2,y0+alto-82-r*2,puntos)
+    return puntos
+
+def lib02_dibujar_esquinas(ax,x0,y0,largo,alto):
+    esquinas=[(x0,y0,1,1),(x0+largo,y0,-1,1),(x0,y0+alto,1,-1),(x0+largo,y0+alto,-1,-1)]
+    for x,y,dx,dy in esquinas:
+        ax.plot([x,x+dx*100],[y,y],color="blue",lw=1.5,zorder=6)
+        ax.plot([x,x],[y,y+dy*100],color="blue",lw=1.5,zorder=6)
+
+def lib02_dibujar_letras(ax,puntos):
+    for i,(x,y) in enumerate(puntos):
+        ax.annotate(lib02_convertir_letra(i),(x,y),xytext=(3,2),textcoords="offset points",fontsize=6,color="darkred",fontweight="bold",zorder=8)
+
+def lib02_dibujar_altillo(ax,alto,largo,espaciamientos):
+    posiciones=[0]
+    acumulado=0
+    for distancia in espaciamientos:
+        acumulado+=distancia
+        posiciones.append(acumulado)
+    posiciones.append(largo-41)
+    posiciones=sorted(set(p for p in posiciones if 0<=p and p+41<=largo))
+    piezas=[(0,0,largo,41),(0,alto-41,largo,41),(41,41,559,41),(largo-600,alto-82,559,41)]+[(p,0,41,alto) for p in posiciones]
+    for x,y,w,h in piezas:
+        lib02_rectangulo(ax,x,y,w,h)
+    puntos=lib02_dibujar_puntos(ax,0,0,alto,largo,posiciones)
+    lib02_dibujar_esquinas(ax,0,0,largo,alto)
+    lib02_dibujar_letras(ax,puntos)
+
+def lib02_generar_altillos():
+    figuras=[]
+    for nombre,alto,largo,espaciamientos in LIB02_ALTILLOS:
+        fig,ax=lib02_crear_figura(f"Altillo {nombre}",largo,alto,120)
+        lib02_dibujar_altillo(ax,alto,largo,espaciamientos)
+        figuras.append(fig)
+    return figuras
+
+def lib02_calcular_posiciones(largo,espaciamientos):
+    posiciones=[0]
+    acumulado=0
+    for distancia in espaciamientos:
+        acumulado+=41+distancia
+        posiciones.append(acumulado)
+    posicion_final=largo-41
+    if posiciones[-1]<posicion_final:
+        posiciones.append(posicion_final)
+    elif posiciones[-1]>posicion_final:
+        print(f"Advertencia: posiciones superan el largo del frontón ({largo} mm).")
+    return posiciones
+
+def lib02_dibujar_fronton(ax,largo,alto_mayor,alto_menor,espaciamientos):
+    pendiente=(alto_mayor-alto_menor)/largo
+    lib02_rectangulo(ax,0,0,largo,41)
+    puntos_superior=[(0,alto_mayor),(largo,alto_menor),(largo,alto_menor-41),(0,alto_mayor-41)]
+    ax.add_patch(Polygon(puntos_superior,closed=True,fill=False,edgecolor="black",linewidth=.8))
+    for x in lib02_calcular_posiciones(largo,espaciamientos):
+        if 0<=x and x+41<=largo:
+            altura=alto_mayor-pendiente*(x+41/2)
+            lib02_rectangulo(ax,x,41,41,max(0,altura-41))
+
+def lib02_generar_frontones():
+    figuras=[]
+    for nombre,largo,alto_mayor,alto_menor,espaciamientos in LIB02_FRONTONES:
+        fig,ax=lib02_crear_figura(f"Frontón triangular {nombre}",largo,alto_mayor,120,(9,5))
+        lib02_dibujar_fronton(ax,largo,alto_mayor,alto_menor,espaciamientos)
+        figuras.append(fig)
+    return figuras
+
+def lib02_dibujar_techumbre(ax,ancho,largo,pies,izquierdas,derechas):
+    e=41
+    lib02_rectangulo(ax,0,0,ancho,largo)
+    lib02_rectangulo(ax,0,0,ancho,e)
+    lib02_rectangulo(ax,0,largo-e,ancho,e)
+    lib02_rectangulo(ax,0,0,e,largo)
+    lib02_rectangulo(ax,ancho-e,0,e,largo)
+    for x in pies:
+        if e<x<ancho-e:
+            lib02_rectangulo(ax,x,e,e,largo-2*e)
+    for y in izquierdas:
+        if 0<=y and y+e<=largo:
+            largo_pieza=max(0,pies[0]-e) if pies else ancho-2*e
+            if largo_pieza>0:
+                lib02_rectangulo(ax,e,y,largo_pieza,e)
+    for y in derechas:
+        if 0<=y and y+e<=largo:
+            inicio=pies[-1]+e if pies else e
+            largo_pieza=max(0,ancho-e-inicio)
+            if largo_pieza>0:
+                lib02_rectangulo(ax,inicio,y,largo_pieza,e)
+
+def lib02_generar_techumbres():
+    figuras=[]
+    for i,(ancho,largo,pies,izquierdas,derechas) in enumerate(LIB02_TECHUMBRES):
+        fig,ax=lib02_crear_figura(f"Techumbre {i+1}",ancho,largo,100)
+        lib02_dibujar_techumbre(ax,ancho,largo,pies,izquierdas,derechas)
+        figuras.append(fig)
+    return figuras
+
+def lib02_dibujar_entrepiso(ax,ancho,largo,pies,espacios):
+    e=41
+    lib02_rectangulo(ax,0,0,ancho,largo)
+    lib02_rectangulo(ax,0,0,ancho,e)
+    lib02_rectangulo(ax,0,largo-e,ancho,e)
+    lib02_rectangulo(ax,0,0,e,largo)
+    lib02_rectangulo(ax,ancho-e,0,e,largo)
+    pies_validos=[x for x in pies if e<x<ancho-e]
+    for x in pies_validos:
+        lib02_rectangulo(ax,x,e,e,largo-2*e)
+    limites=sorted(set([e]+pies_validos+[ancho-e]))
+    for i,posiciones in enumerate(espacios):
+        if i>=len(limites)-1:
+            break
+        x_inicio=limites[i]
+        ancho_pieza=limites[i+1]-x_inicio
+        for y in posiciones:
+            if 0<=y and y+e<=largo:
+                lib02_rectangulo(ax,x_inicio,y,ancho_pieza,e)
+
+def lib02_generar_entrepisos():
+    figuras=[]
+    for i,(ancho,largo,pies,*espacios) in enumerate(LIB02_ENTREPISOS):
+        fig,ax=lib02_crear_figura(f"Entrepiso {i+1}",ancho,largo,100)
+        lib02_dibujar_entrepiso(ax,ancho,largo,pies,espacios)
+        figuras.append(fig)
+    return figuras
+
+
+# ============================================================
+# FUNCION PARA MOSTRAR FIGURAS EN STREAMLIT
+# ============================================================
+
+def mostrar_figuras(figuras,columnas=2):
+    for inicio in range(0,len(figuras),columnas):
+        cols=st.columns(columnas)
+        for j,figura in enumerate(figuras[inicio:inicio+columnas]):
+            with cols[j]:
+                st.pyplot(figura,use_container_width=True)
+            plt.close(figura)
+
+
+# ============================================================
+# INTERFAZ PRINCIPAL
+# ============================================================
 
 st.markdown("""
 <style>
-.main-title{text-align:center;font-size:42px;font-weight:800;margin-bottom:4px}
-.subtitle{text-align:center;color:#8a8a8a;font-size:16px;margin-bottom:28px}
-div.stButton>button{width:100%;height:58px;font-size:18px;font-weight:700;border-radius:10px}
+.main-title{
+    text-align:center;
+    font-size:42px;
+    font-weight:800;
+    margin-bottom:4px;
+}
+.subtitle{
+    text-align:center;
+    color:#8a8a8a;
+    font-size:16px;
+    margin-bottom:28px;
+}
+div.stButton>button{
+    width:100%;
+    height:58px;
+    font-size:18px;
+    font-weight:700;
+    border-radius:10px;
+}
 </style>
 """,unsafe_allow_html=True)
 
@@ -561,21 +620,36 @@ with col3:
 
 st.divider()
 
-def mostrar_figuras(figuras,columnas=2):
-    for inicio in range(0,len(figuras),columnas):
-        cols=st.columns(columnas)
-        for j,figura in enumerate(figuras[inicio:inicio+columnas]):
-            with cols[j]:
-                st.pyplot(figura,use_container_width=True)
-            plt.close(figura)
+
+# ============================================================
+# BOTON LIB 00 - CODIGO ORIGINAL
+# ============================================================
 
 if st.session_state.libreria_seleccionada=="LIB 00":
+
     st.subheader("LIBRERÍA 00")
-    st.info("Esta librería estará disponible próximamente.")
+    st.caption("Refugio")
+
+    figuras=plot_muros_altillos(MUROS_LIB_02)
+
+    for figura in figuras:
+        st.pyplot(figura,use_container_width=False)
+        plt.close(figura)
+
+
+# ============================================================
+# BOTON LIB 01
+# ============================================================
 
 elif st.session_state.libreria_seleccionada=="LIB 01":
+
     st.subheader("LIBRERÍA 01")
     st.info("Esta librería estará disponible próximamente.")
+
+
+# ============================================================
+# BOTON LIB 02 - NUEVOS COMPONENTES
+# ============================================================
 
 elif st.session_state.libreria_seleccionada=="LIB 02":
 
@@ -583,36 +657,42 @@ elif st.session_state.libreria_seleccionada=="LIB 02":
     st.caption("Componentes estructurales")
 
     st.markdown("### 1. Muros con ventanas y puertas")
-    mostrar_figuras(generar_figuras_muros_aberturas())
+    mostrar_figuras(lib02_generar_muros_aberturas())
 
     st.divider()
+
     st.markdown("### 2. Muros ciegos - Grupo 1")
-    mostrar_figuras(generar_figuras_muros_ciegos(MUROS_CIEGOS,"Grupo 1"))
+    mostrar_figuras(lib02_generar_muros_ciegos(LIB02_MUROS_CIEGOS,"Grupo 1"))
 
     st.divider()
+
     st.markdown("### 3. Muros ciegos - Grupo 2")
-    mostrar_figuras(generar_figuras_muros_ciegos(MUROS_CIEGOS_2,"Grupo 2"))
+    mostrar_figuras(lib02_generar_muros_ciegos(LIB02_MUROS_CIEGOS_2,"Grupo 2"))
 
     st.divider()
+
     st.markdown("### 4. Altillos")
-    mostrar_figuras(generar_figuras_altillos_componentes())
+    mostrar_figuras(lib02_generar_altillos())
 
     st.divider()
+
     st.markdown("### 5. Frontones triangulares")
-    mostrar_figuras(generar_figuras_frontones())
+    mostrar_figuras(lib02_generar_frontones())
 
     st.divider()
+
     st.markdown("### 6. Techumbres")
-    mostrar_figuras(generar_figuras_techumbres())
+    mostrar_figuras(lib02_generar_techumbres())
 
     st.divider()
+
     st.markdown("### 7. Entrepisos")
-    mostrar_figuras(generar_figuras_entrepisos())
+    mostrar_figuras(lib02_generar_entrepisos())
 
-    st.divider()
-    st.markdown("### 8. Muros y altillos - LIB 02")
-    mostrar_figuras(plot_muros_altillos(MUROS_LIB_02))
+
+# ============================================================
+# SIN LIBRERIA SELECCIONADA
+# ============================================================
 
 else:
     st.info("Selecciona una librería para visualizar su contenido.")
-
